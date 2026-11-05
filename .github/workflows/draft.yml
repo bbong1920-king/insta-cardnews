@@ -1,0 +1,64 @@
+name: 카드뉴스 만들기
+
+on:
+  schedule:
+    # 한국시간 08:00, 12:30, 19:00 (GitHub 는 UTC 기준)
+    - cron: "0 23 * * *"
+    - cron: "30 3 * * *"
+    - cron: "0 10 * * *"
+  workflow_dispatch: {}   # Actions 탭에서 수동 실행 가능
+
+concurrency:
+  group: cardnews
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+      IG_USER_ID: ${{ secrets.IG_USER_ID }}
+      THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+      REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+      REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Claude Code CLI 설치 (구독 토큰으로 실행)
+        run: npm install -g @anthropic-ai/claude-code
+      - run: |
+          python -m playwright install --with-deps chromium
+          sudo apt-get install -y -q fonts-noto-cjk
+
+      - name: 카드 생성
+        run: python -m cardnews draft
+
+      - name: 카드 이미지 저장 (인스타가 가져갈 공개 URL 만들기)
+        run: |
+          git config user.name "cardnews-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data output
+          git diff --cached --quiet || git commit -m "draft: 카드뉴스 생성"
+          git pull --rebase && git push
+
+      - name: 자동 게시 모드면 바로 게시
+        run: python -m cardnews poll
+
+      - name: 게시 결과 저장
+        run: |
+          git add data
+          git diff --cached --quiet || git commit -m "poll: 게시 상태 갱신"
+          git pull --rebase && git push

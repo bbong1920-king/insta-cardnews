@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root { --accent: {{accent}}; --bg: #0c0d10; }
+  html, body { width: 1080px; height: 1350px; background: var(--bg); }
+  body {
+    font-family: "Pretendard", "Noto Sans CJK KR", "Malgun Gothic", sans-serif;
+    color: #fff; overflow: hidden; position: relative;
+    word-break: keep-all; -webkit-font-smoothing: antialiased;
+  }
+
+  .photo {
+    position: absolute; inset: 0 0 auto 0; height: 860px;
+    background: {{photo_bg}}; background-size: cover; background-position: {{photo_pos}};
+  }
+  .photo::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(12,13,16,.55) 0%, rgba(12,13,16,0) 22%,
+                rgba(12,13,16,0) 55%, rgba(12,13,16,.85) 85%, var(--bg) 100%);
+  }
+  .no-photo .photo::before {
+    content: "WORLD\ANEWS"; white-space: pre; position: absolute; left: 56px; top: 170px;
+    font-size: 250px; font-weight: 900; line-height: .95; letter-spacing: -8px;
+    color: transparent; -webkit-text-stroke: 2px rgba(255,255,255,.09);
+  }
+
+  .top {
+    position: absolute; top: 56px; left: 64px; right: 64px;
+    display: flex; justify-content: space-between; align-items: center; z-index: 2;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 14px;
+    font-size: 30px; font-weight: 800; letter-spacing: -0.5px; text-shadow: 0 2px 12px rgba(0,0,0,.5);
+  }
+  .brand::before { content: ""; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); }
+  .tag {
+    font-size: 26px; font-weight: 700; padding: 10px 22px; border-radius: 999px;
+    background: rgba(0,0,0,.45); border: 1.5px solid rgba(255,255,255,.35);
+    backdrop-filter: blur(6px);
+  }
+
+  .credit {
+    position: absolute; top: 808px; right: 64px; z-index: 2;
+    font-size: 18px; color: rgba(255,255,255,.6); max-width: 760px; text-align: right;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .text { position: absolute; left: 64px; right: 64px; bottom: 150px; z-index: 2; }
+  .kicker {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-size: 28px; font-weight: 800; color: var(--accent); margin-bottom: 22px;
+  }
+  .kicker::before { content: ""; width: 44px; height: 6px; background: var(--accent); border-radius: 3px; }
+  .headline {
+    font-size: 84px; font-weight: 900; line-height: 1.18; letter-spacing: -2.5px;
+    white-space: pre-line; max-height: 300px; overflow: hidden;
+  }
+  .sub {
+    margin-top: 26px; font-size: 36px; font-weight: 500; line-height: 1.45;
+    color: rgba(255,255,255,.78); letter-spacing: -0.6px;
+  }
+
+  .bottom {
+    position: absolute; left: 64px; right: 64px; bottom: 56px; z-index: 2;
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 26px; border-top: 1.5px solid rgba(255,255,255,.16);
+    font-size: 24px; color: rgba(255,255,255,.6);
+  }
+  .bottom .more { color: #fff; font-weight: 700; }
+</style>
+</head>
+<body class="{{body_class}}">
+  <div class="photo"></div>
+
+  <div class="top">
+    <div class="brand">{{brand}}</div>
+    <div class="tag">{{tag}}</div>
+  </div>
+
+  <div class="credit">{{credit}}</div>
+
+  <div class="text">
+    <div class="kicker">해외 화제</div>
+    <div class="headline" id="headline">{{headline}}</div>
+    <div class="sub">{{subheadline}}</div>
+  </div>
+
+  <div class="bottom">
+    <div>출처 · {{sources}}</div>
+    <div class="more">자세한 내용은 캡션에서 ↓</div>
+  </div>
+
+<script>
+  // 제목이 길면 3줄 안에 들어갈 때까지 글자 크기를 줄인다
+  window.fitHeadline = () => {
+    const el = document.getElementById("headline");
+    let size = 84;
+    while (el.scrollHeight > 300 && size > 54) {
+      size -= 2;
+      el.style.fontSize = size + "px";
+      el.style.maxHeight = "none";
+    }
+  };
+</script>
+</body>
+</html>
