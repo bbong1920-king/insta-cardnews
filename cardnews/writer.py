@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from . import checks
 from .config import env
 
 _client = None
@@ -163,25 +164,42 @@ def select_story(cfg: dict, items: list[dict], recent: list[str]) -> dict:
 
 # ── 2단계: 카드 문구 + 설명글 작성 ─────────────────────────
 
-WRITE_SYSTEM = """당신은 한국 인스타그램/스레드 '해외 화제 뉴스' 계정의 에디터입니다.
+SECTION_GUIDE = "\n".join(
+    f"  {kind}: " + " / ".join(f"📌 {s}" for s in sections) for kind, sections in checks.STORY_SECTIONS.items()
+)
+
+WRITE_SYSTEM = f"""당신은 한국 인스타그램/스레드 '해외 화제 뉴스' 계정의 에디터입니다.
 같은 사건을 다룬 외신 기사 여러 개를 읽고, 한국 독자용 카드뉴스 1장과 설명글을 씁니다.
 
 반드시 지킬 것:
 - 원문을 번역해서 옮기지 말고, 확인된 사실을 바탕으로 당신의 문장으로 새로 정리하세요.
   원문 문장을 그대로 인용하는 것은 짧은 발언 인용(따옴표) 정도만 허용됩니다.
 - 기사들 사이에 내용이 다르거나 확인되지 않은 부분은 단정하지 말고 "~로 알려졌다", "~라고 밝혔다"처럼 쓰세요.
+  기사에 안 나온 내용을 "발표되지 않았다", "없다"로 단정하지 마세요. 기사에서 확인하지 못했을 뿐일 수 있습니다.
 - 숫자, 이름, 날짜는 원문 그대로 정확히. 외국 인명/지명은 국립국어원 외래어 표기법을 따르세요.
-- 자극적인 낚시 제목 금지. 흥미롭되 사실에 맞게.
-- 존댓말이 아닌 뉴스체 (~했다, ~이다)로 쓰세요. 단, 설명글 마지막 한 줄은 독자에게 묻는 질문으로 끝내도 좋습니다.
+  원문 숫자로 직접 계산한 값(예: 몇 년 만에)을 썼다면 fact_notes 에 적으세요.
+- 자극적인 낚시 제목 금지. 흥미롭되 사실에 맞게. "충격", "경악", "발칵", "이것", "그 이유", "알고 보니"처럼
+  감정을 부풀리거나 핵심을 숨기는 표현 대신 무슨 일이 있었는지를 제목에 직접 쓰세요.
+- 사람들의 반응은 기사에 실제로 나온 것만 쓰세요. 없으면 쓰지 마세요. 출처 없는 "누리꾼 반응"을 지어내면 안 됩니다.
+- 설명글은 존댓말이 아닌 뉴스체 (~했다, ~이다)로 쓰세요. 마지막 한 줄은 정말 대화거리가 될 때만 독자에게 묻는
+  질문으로 끝내고, 억지로 넣지 마세요. 스레드 글의 말투는 threads_text 안내를 따르세요.
 
 필드 안내:
-- headline: 카드 메인 제목. 띄어쓰기 포함 30자 이내. 줄바꿈이 필요하면 \\n 을 한 번만.
+- story_type: 사건 / 인물 / 정책 / 연구 / 기타 중 이 뉴스의 중심에 가장 가까운 것.
+- headline_candidates: 제목 후보 5개. 표현만 바꾸지 말고 서로 다른 각도(결과, 기록, 갈등, 숫자, 앞으로 등)로 쓰세요.
+  각각 headline 과 같은 글자 수 제한을 지킵니다.
+- headline: 후보 중 사실에 충실하면서 가장 궁금해지는 1개. 카드 메인 제목. 띄어쓰기 포함 30자 이내. 줄바꿈이 필요하면 \\n 을 한 번만.
 - subheadline: 제목 아래 한 줄 설명. 45자 이내.
 - tag: 지역/분야 태그 2~6자 (예: "미국", "유럽", "우주", "기후")
-- caption_body: 인스타그램 설명글 본문. 다음 구조로 900~1400자:
-  첫 줄 훅(한 문장) / 빈 줄 / 📌 무슨 일이? / 📌 배경 / 📌 왜 중요한가 / 📌 반응·앞으로
-  각 소제목 아래 2~4문장. 출처와 해시태그는 넣지 마세요 (코드가 자동으로 붙입니다).
-- threads_text: 스레드용 글. 400자 이내, 핵심만 대화하듯.
+- caption_body: 인스타그램 설명글 본문. 900~1400자. 첫 줄 훅(핵심 사실을 담은 한 문장) / 빈 줄 / story_type 별 소제목:
+{SECTION_GUIDE}
+  기타: 내용에 맞는 📌 소제목 3~4개를 직접 정하세요.
+  고른 story_type 의 소제목을 글자 그대로 쓰세요. 기사에 내용이 없는 소제목은 빼고, 각 소제목 아래 2~4문장으로 쓰세요.
+  '왜 중요한가', '왜 화제인가'는 기록이나 경력을 나열하지 말고 "그래서 무엇이 달라지나"에 답하세요.
+  기록과 경력은 '어떤 사람인가'에 쓰세요. 한국과의 관련성은 기사에서 확인될 때만 언급하세요.
+  출처와 해시태그는 넣지 마세요 (코드가 자동으로 붙입니다).
+- threads_text: 스레드용 글. 400자 이내. 설명글을 줄이지 말고 친구에게 말하듯 짧은 반말(~했대, ~래)로 새로 쓰세요.
+  첫 문장에 가장 놀라운 사실을 넣되, 사실을 부풀리지 마세요. ㅋㅋ, ㄷㄷ 같은 초성체는 쓰지 마세요.
 - hashtags: 한국어 해시태그 5개 이하 (# 없이)
 - image_queries: Wikimedia Commons 에서 찾을 영어 검색어 3개. 사건 현장 사진은 없으니
   관련 인물 이름, 장소/랜드마크, 사물처럼 자유 라이선스 사진이 있을 법한 것으로.
@@ -191,6 +209,8 @@ WRITE_SYSTEM = """당신은 한국 인스타그램/스레드 '해외 화제 뉴�
 - fact_notes: 기사들끼리 엇갈리거나 불확실한 점 (없으면 빈 문자열). 승인자에게 보여줍니다."""
 
 WRITE_SCHEMA = _obj({
+    "story_type": {**STR, "enum": [*checks.STORY_SECTIONS, "기타"]},
+    "headline_candidates": {"type": "array", "items": STR},
     "headline": STR,
     "subheadline": STR,
     "tag": STR,
@@ -209,7 +229,27 @@ def write_card(cfg: dict, story: str, articles: list[dict]) -> dict:
     for a in articles:
         body = a["text"] or f"(본문 추출 실패, 요약만) {a['summary']}"
         parts.append(f"=== {a['source']}: {a['title']}\n{body}\n")
-    return _ask(cfg, WRITE_SYSTEM, "\n".join(parts), WRITE_SCHEMA)
+    text = "\n".join(parts)
+    card = _ask(cfg, WRITE_SYSTEM, text, WRITE_SCHEMA)
+
+    problems = checks.check_card(card)
+    if problems:
+        print(f"[writer] 다시 작성: {problems}")
+        retry = (
+            f"{text}\n\n아래 초안의 문제만 고쳐서 다시 작성하세요.\n"
+            f"초안: {json.dumps(card, ensure_ascii=False)}\n\n고칠 점:\n" + "\n".join(f"- {p}" for p in problems)
+        )
+        try:
+            card = _ask(cfg, WRITE_SYSTEM, retry, WRITE_SCHEMA)
+        except RuntimeError as e:  # 사용량 한도 등으로 실패해도 첫 초안은 살리고 승인자에게 경고한다
+            print(f"[writer] 다시 작성 실패, 첫 초안 사용: {e}")
+
+    card["warnings"] = checks.check_card(card)
+    numbers = checks.unverified_numbers(card, articles)
+    if numbers:
+        card["warnings"].append(f"원문에서 못 찾은 숫자: {', '.join(numbers)}")
+    print(f"[writer] 유형: {card['story_type']}, 경고: {card['warnings'] or '없음'}")
+    return card
 
 
 # ── 3단계: 후보 사진 중 고르기 (이미지 보고 판단) ─────────────

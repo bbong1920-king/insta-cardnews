@@ -4,6 +4,7 @@ from pathlib import Path
 
 import requests
 
+from . import checks
 from .config import env
 
 
@@ -49,8 +50,16 @@ def send_preview(entry: dict, needs_approval: bool) -> int:
             {"text": "❌ 버리기", "callback_data": f"reject:{entry['id']}"},
         ]]
     links = "\n".join(entry["links"][:3])
+    # 메시지가 길면 뒤부터 잘리므로 승인 판단에 필요한 점검 결과를 맨 앞에 둔다
+    warnings = "".join(f"⚠️ {w}\n" for w in card["warnings"])
+    if warnings:
+        warnings += "\n"
+    headline = checks.plain_headline(card["headline"])
+    others = [c for c in map(checks.plain_headline, card["headline_candidates"]) if c != headline]
+    candidates = "\n\n[다른 제목 후보]\n" + "\n".join(f"- {c}" for c in others) if others else ""
     msg = send_text(
-        f"[인스타 설명글]\n{entry['caption']}\n\n[스레드]\n{entry['threads_text']}\n\n[원문]\n{links}",
+        f"{warnings}[인스타 설명글]\n{entry['caption']}\n\n[스레드]\n{entry['threads_text']}"
+        f"{candidates}\n\n[원문]\n{links}",
         buttons,
     )
     return msg["message_id"]
