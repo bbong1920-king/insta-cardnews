@@ -1,10 +1,11 @@
 name: 카드뉴스 만들기
 
 on:
-  schedule:
-    # 한국시간 06:30, 16:30 에 만들어 08:00, 18:00 전에 승인하고 게시 (GitHub 는 UTC 기준)
-    - cron: "30 21 * * *"
-    - cron: "30 7 * * *"
+  # 텔레그램 연결 전까지 자동 생성을 멈춤. 다시 켜려면 아래 네 줄 맨 앞의 "# "(샵과 공백)를 지운다
+  # schedule:
+  #   # 한국시간 06:30, 16:30 에 만들어 08:00, 18:00 전에 승인하고 게시 (GitHub 는 UTC 기준)
+  #   - cron: "30 21 * * *"
+  #   - cron: "30 7 * * *"
   workflow_dispatch: {}   # Actions 탭에서 수동 실행 가능
 
 concurrency:
@@ -17,7 +18,7 @@ permissions:
 jobs:
   draft:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 75   # 카드 생성 + 승인 대기(approval_wait_minutes) + 게시
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -53,10 +54,11 @@ jobs:
           git diff --cached --quiet || git commit -m "draft: 카드뉴스 생성"
           git pull --rebase && git push
 
-      - name: 자동 게시 모드면 바로 게시
-        run: python -m cardnews poll
+      - name: 승인 버튼을 기다렸다가 바로 게시
+        run: python -m cardnews wait
 
       - name: 게시 결과 저장
+        if: always()   # 게시 기록을 남겨야 다음 실행에서 같은 카드를 다시 올리지 않는다
         run: |
           git add data
           git diff --cached --quiet || git commit -m "poll: 게시 상태 갱신"

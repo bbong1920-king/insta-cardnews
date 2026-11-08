@@ -11,6 +11,9 @@ brand:
 # false = 완전 자동 게시 (단, 민감한 뉴스로 판단되면 승인 요청으로 돌림)
 approval: true
 
+# 카드를 보낸 뒤 버튼 응답을 기다리는 시간(분). 이 안에 누르면 바로 게시
+approval_wait_minutes: 40
+
 platforms: [instagram, threads]
 
 threads:

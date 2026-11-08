@@ -2,7 +2,8 @@ name: 승인 확인 및 게시
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # 10분마다 텔레그램 버튼 응답 확인
+    # 대기 시간이 지난 뒤 누른 버튼을 처리한다. GitHub 사정으로 실제로는 몇 시간 간격으로 돌 수 있다
+    - cron: "*/10 * * * *"
   workflow_dispatch: {}
 
 concurrency:
