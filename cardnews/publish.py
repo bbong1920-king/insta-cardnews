@@ -49,11 +49,13 @@ def instagram(cfg: dict, image_url: str, caption: str) -> str:
     return info.get("permalink", media_id)
 
 
-def threads(image_url: str, text: str) -> str:
+def threads(image_url: str | None, text: str) -> str:
+    """image_url 이 None 이면 글만 게시한다."""
     token = env("THREADS_ACCESS_TOKEN", required=True)
 
+    media = {"media_type": "IMAGE", "image_url": image_url} if image_url else {"media_type": "TEXT"}
     container = _check(requests.post(f"{THREADS_API}/me/threads", data={
-        "media_type": "IMAGE", "image_url": image_url, "text": text, "access_token": token,
+        **media, "text": text, "access_token": token,
     }, timeout=60), "스레드 컨테이너 생성")["id"]
     _wait_ready(f"{THREADS_API}/{container}", "status", token, "스레드")
 

@@ -13,6 +13,10 @@ approval: true
 
 platforms: [instagram, threads]
 
+threads:
+  include_link: false    # 기사 링크 넣기. 새 계정은 첫 1주 동안 끄고, 이후 켜서 반응을 비교
+  with_image: true       # false 면 카드 이미지 없이 글만 게시
+
 # Claude 를 부르는 방식
 #   claude-code = Claude Pro/Max 구독 토큰으로 실행 (추가 비용 없음, 구독 사용량을 씀)
 #   api         = Claude API 키로 실행 (사용량만큼 과금)
