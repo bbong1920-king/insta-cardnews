@@ -6,7 +6,9 @@ CAPTION_RANGE = (800, 1500)
 HEADLINE_MAX = 30
 SUBHEADLINE_MAX = 45
 TAG_MAX = 6
-THREADS_MAX = 400
+# 프롬프트의 목표치(200자)보다 조금 넉넉하게 잡는다
+THREADS_MAX = 230
+THREADS_LINES = (3, 5)
 BAIT_WORDS = ("충격", "경악", "발칵", "이것", "그 이유", "알고 보니")
 
 # 뉴스 유형별 설명글 소제목. '기타'는 소제목을 자유롭게 정한다
@@ -48,6 +50,10 @@ def check_card(card: dict) -> list[str]:
     for name, text, limit in limits:
         if len(text) > limit:
             problems.append(f"{name} 가 {len(text)}자입니다. {limit}자 이내로 줄이세요.")
+
+    lines = [line for line in card["threads_text"].splitlines() if line.strip()]
+    if not THREADS_LINES[0] <= len(lines) <= THREADS_LINES[1]:
+        problems.append(f"threads_text 가 {len(lines)}줄입니다. 한 줄에 한 문장씩 3~5줄로 나누세요.")
 
     low, high = CAPTION_RANGE
     if not low <= len(card["caption_body"]) <= high:

@@ -29,7 +29,7 @@ def clip_text(text: str, limit: int) -> str:
     return text[:ends[-1] if ends else limit].rstrip()
 
 
-def build_captions(card: dict, source_names: list[str], links: list[str], image: dict) -> tuple[str, str]:
+def build_captions(cfg: dict, card: dict, source_names: list[str], links: list[str], image: dict) -> tuple[str, str]:
     tags = " ".join("#" + t.lstrip("#").replace(" ", "") for t in card["hashtags"][:5])
     footer = [f"📰 출처: {', '.join(source_names)}"]
     if image.get("caption_credit"):
@@ -39,7 +39,7 @@ def build_captions(card: dict, source_names: list[str], links: list[str], image:
     caption = f"{body}\n\n{footer_text}"
 
     th_footer = f"\n\n출처: {source_names[0]}" + (" 외" if len(source_names) > 1 else "")
-    if links:
+    if links and cfg.get("threads", {}).get("include_link", False):
         th_footer += f"\n{links[0]}"
     threads_text = clip_text(card["threads_text"], THREADS_MAX - len(th_footer)) + th_footer
     return caption, threads_text
@@ -100,7 +100,7 @@ def cmd_draft(cfg: dict) -> None:
     source_names = list(dict.fromkeys(a["source"] for a in articles))
     out = render.render(render.build_html(cfg, card, image, source_names), OUTPUT_DIR / f"{card_id}.jpg")
     links = [a["link"] for a in articles]
-    caption, threads_text = build_captions(card, source_names, links, image)
+    caption, threads_text = build_captions(cfg, card, source_names, links, image)
 
     needs_approval = cfg.get("approval", True) or card["sensitive"]
     entry = {
@@ -159,7 +159,8 @@ def publish_approved(cfg: dict, st: dict) -> None:
             if "instagram" in cfg["platforms"] and "instagram" not in done:
                 done["instagram"] = publish.instagram(cfg, url, entry["caption"])
             if "threads" in cfg["platforms"] and "threads" not in done:
-                done["threads"] = publish.threads(url, entry["threads_text"])
+                with_image = cfg.get("threads", {}).get("with_image", True)
+                done["threads"] = publish.threads(url if with_image else None, entry["threads_text"])
         except Exception as e:  # noqa: BLE001 - 어떤 실패든 텔레그램으로 알리고 다음 실행에서 재시도
             entry["attempts"] += 1
             msg = f"❌ {card_id} 게시 실패 ({entry['attempts']}/3): {e}"

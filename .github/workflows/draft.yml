@@ -2,10 +2,9 @@ name: 카드뉴스 만들기
 
 on:
   schedule:
-    # 한국시간 08:00, 12:30, 19:00 (GitHub 는 UTC 기준)
-    - cron: "0 23 * * *"
-    - cron: "30 3 * * *"
-    - cron: "0 10 * * *"
+    # 한국시간 06:30, 16:30 에 만들어 08:00, 18:00 전에 승인하고 게시 (GitHub 는 UTC 기준)
+    - cron: "30 21 * * *"
+    - cron: "30 7 * * *"
   workflow_dispatch: {}   # Actions 탭에서 수동 실행 가능
 
 concurrency:
