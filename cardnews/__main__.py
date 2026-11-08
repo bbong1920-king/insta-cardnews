@@ -1,7 +1,8 @@
 """
 사용법
   python -m cardnews draft          뉴스 선정 → 카드 생성 → 승인 요청 (또는 자동 게시 대기열)
-  python -m cardnews poll           텔레그램 버튼 응답 처리 + 승인된 카드 게시
+  python -m cardnews poll           텔레그램 버튼 응답 처리 + 승인된 카드 게시 (한 번 확인)
+  python -m cardnews wait           버튼 응답을 기다렸다가 바로 게시 (approval_wait_minutes 동안)
   python -m cardnews sample         API 키 없이 디자인 확인용 샘플 카드 만들기
   python -m cardnews chat-id        텔레그램 chat id 확인
   python -m cardnews refresh-tokens 인스타/스레드 장기 토큰 연장
@@ -12,6 +13,8 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import requests
 
 from . import article, images, publish, render, sources, state, telegram, writer
 from .config import OUTPUT_DIR, ROOT, env, load_config
@@ -128,9 +131,9 @@ def cmd_draft(cfg: dict) -> None:
 
 # ── poll ─────────────────────────────────────────────────
 
-def handle_telegram(st: dict) -> None:
+def handle_telegram(st: dict, wait: int = 0) -> None:
     chat_id = str(env("TELEGRAM_CHAT_ID"))
-    for upd in telegram.get_updates(st.get("tg_offset", 0)):
+    for upd in telegram.get_updates(st.get("tg_offset", 0), wait):
         st["tg_offset"] = upd["update_id"] + 1
         cq = upd.get("callback_query")
         if not cq or str(cq["message"]["chat"]["id"]) != chat_id:
@@ -187,6 +190,52 @@ def cmd_poll(cfg: dict) -> None:
     state.save(st)
 
 
+def _cards_with_status(st: dict, status: str) -> list[dict]:
+    return [e for e in st["pending"].values() if e["status"] == status]
+
+
+def _waiting_on_buttons(st: dict) -> list[dict]:
+    # 텔레그램 없이 만든 카드에는 누를 버튼이 없으므로 기다리지 않는다
+    return [e for e in _cards_with_status(st, "waiting") if e.get("tg_message_id")]
+
+
+def cmd_wait(cfg: dict) -> None:
+    """카드를 만든 작업 안에서 버튼 응답을 기다렸다가 바로 게시한다.
+
+    GitHub 예약 실행은 몇 시간씩 늦을 수 있어 poll 예약만으로는 승인 후 게시가 늦어진다.
+    """
+    minutes = cfg.get("approval_wait_minutes", 40)
+    deadline = time.time() + minutes * 60
+    st = state.load()
+    use_telegram = telegram.enabled()
+    while True:
+        if use_telegram:
+            wait = int(min(30, max(0, deadline - time.time()))) if _waiting_on_buttons(st) else 0
+            try:
+                handle_telegram(st, wait)
+            except (RuntimeError, requests.RequestException, ValueError) as e:
+                print(f"[wait] 텔레그램 확인 실패, 다시 시도: {e}")
+                time.sleep(5)
+        publish_approved(cfg, st)
+        state.save(st)
+
+        if not use_telegram or not (_waiting_on_buttons(st) or _cards_with_status(st, "approved")):
+            break
+        if time.time() >= deadline:
+            if _waiting_on_buttons(st):
+                telegram.send_text(
+                    f"⏰ {minutes}분 동안 응답이 없어 대기를 끝냈습니다. "
+                    "지금 누르면 게시까지 몇 시간 걸릴 수 있고, 만든 지 "
+                    f"{cfg.get('pending_expire_hours', 24)}시간이 지나면 카드는 폐기됩니다."
+                )
+            break
+        if not _waiting_on_buttons(st):
+            time.sleep(30)  # 게시 실패를 재시도하기 전에 잠시 기다린다
+
+    expire_pending(cfg, st)
+    state.save(st)
+
+
 # ── 보조 명령 ─────────────────────────────────────────────
 
 def cmd_sample(cfg: dict) -> None:
@@ -231,6 +280,7 @@ def main() -> None:
     commands = {
         "draft": lambda: cmd_draft(cfg),
         "poll": lambda: cmd_poll(cfg),
+        "wait": lambda: cmd_wait(cfg),
         "sample": lambda: cmd_sample(cfg),
         "chat-id": cmd_chat_id,
         "refresh-tokens": lambda: publish.refresh_tokens(cfg),

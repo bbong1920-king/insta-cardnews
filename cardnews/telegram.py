@@ -65,13 +65,18 @@ def send_preview(entry: dict, needs_approval: bool) -> int:
     return msg["message_id"]
 
 
-def get_updates(offset: int) -> list[dict]:
-    return _call("getUpdates", offset=offset, timeout=0,
+def get_updates(offset: int, wait: int = 0) -> list[dict]:
+    """wait 초 동안 새 응답을 기다린다 (요청 제한 시간 60초보다 짧아야 한다)."""
+    return _call("getUpdates", offset=offset, timeout=wait,
                  allowed_updates=json.dumps(["callback_query", "message"]))
 
 
 def answer(callback_id: str, text: str) -> None:
-    _call("answerCallbackQuery", callback_query_id=callback_id, text=text)
+    # 오래된 버튼 응답은 텔레그램이 거절하지만, 승인 처리는 계속해야 한다
+    try:
+        _call("answerCallbackQuery", callback_query_id=callback_id, text=text)
+    except RuntimeError as e:
+        print(f"[telegram] 버튼 응답 표시 실패: {e}")
 
 
 def clear_buttons(message_id: int) -> None:
